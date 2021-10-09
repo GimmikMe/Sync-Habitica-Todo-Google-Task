@@ -1,24 +1,34 @@
-const HABITICA_CREATORID = "474a02be-aa26-451d-aa60-6f1db8347c68"
-const PROJEKT_NAME = "Habitica Google Tasks"
-const HABITICA_TOKEN = "";	//Insert habitica API token here
-const HABITICA_ID = "";		//Insert habitica User ID here
+/* ========================================== */
+/* [Users] Required script data to fill in    */
+/* ========================================== */
+const USER_ID = ""; //Insert habitica User ID here
+const API_TOKEN = "";//Insert habitica API token here and DO NOT share this with anyone
+const WEB_APP_URL = "";
 
+// PASTE NEW CODE IMMEDIATELY BELOW THIS LINE (to keep our API tokens and tasks private)//
+//--------------------------------------------------------------------------//
+const AUTHOR_ID = ("474a02be-aa26-451d-aa60-6f1db8347c68","59ae9025-f19f-4c05-8b08-0e99167fb118"); //should we add 2 IDs? No idea how this works...
+const SCRIPT_NAME = "Habitica Google Tasks";
 
-function myFunction() {
+/* ========================================== */
+/*               Main Functions               */
+/* ========================================== */
+
+function habiticaGoogleTasks() {
   const habTaskURL = "https://habitica.com/api/v3/tasks/";
-  const templateParams = {
+  const templateParams = {    //X-Client header
     _post: {
       method: "post",
-      headers: { "x-client": (HABITICA_CREATORID + "-" + PROJEKT_NAME), "x-api-user": HABITICA_ID, "x-api-key": HABITICA_TOKEN },
+      headers: { "x-client": (AUTHOR_ID + "-" + SCRIPT_NAME), "x-api-user": USER_ID, "x-api-key": API_TOKEN },
     },
     _get: {
       contentType: "application/json",
       method: "get",
-      headers: { "x-api-user": HABITICA_ID, "x-api-key": HABITICA_TOKEN },
+      headers: { "x-api-user": USER_ID, "x-api-key": API_TOKEN },
     },
     _delete: {
       method: "delete",
-      headers: { "x-api-user": HABITICA_ID, "x-api-key": HABITICA_TOKEN },
+      headers: { "x-api-user": USER_ID, "x-api-key": API_TOKEN },
     },
   };
   console.log(templateParams._post.headers["x-client"]);
@@ -59,12 +69,15 @@ function myFunction() {
   
 }
 
-function getFirstTaskListId() {
-  /**
- * Lists tasks titles and IDs. returns the 1st task list found
+/* ========================================== */
+/*         Google Tasks API functions         */
+/* ========================================== */
+
+/**
+ * Lists task lists titles and IDs. returns the 1st task list found
  */
-{
-  
+function getFirstTaskListId() {
+{ 
   var taskLists = Tasks.Tasklists.list();
   if (taskLists.items) {
     for (var i = 0; i < taskLists.items.length; i++) {
@@ -80,16 +93,40 @@ return taskLists.items[0].id
 }
 
 /**
- * Lists task items for a provided tasklist ID.
+ * Lists task items (max 100) for a provided tasklist ID.
  * @param  {string} taskListId The tasklist ID.
  */
 function listTasks(taskListId) {
-  var tasks = Tasks.Tasks.list(taskListId);
+  var taskListId = getFirstTaskListId(); //for testing
+  var optionalArgs = {maxResults: 100};  //increases the default nr of tasks retrieved from 20 to 100 (max allowed)
+  var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
   if (tasks.items) {
-    for (var i = 0; i < tasks.items.length; i++) {
+    var listSize = tasks.items.length;
+    Logger.log('List size: ' + listSize)
+    for (var i = 0; i < listSize; i++) {
       var task = tasks.items[i];
-      Logger.log('Task with title "%s" and ID "%s" was found.',
+      Logger.log('Title: "%s" - ID "%s"',
                  task.title, task.id);
+    }
+  } else {
+    Logger.log('No tasks found.');
+  }
+}
+
+/**
+ * Deletes all tasks from a tasklist, but keeps the tasklist.
+ * @param  {string} taskListId The tasklist ID.
+ */
+function clearAllTasks(taskListId) {
+  var taskListId = getFirstTaskListId() //for testing
+  var optionalArgs = {maxResults: 100}; //increases the default nr of tasks retrieved from 20 to 100 (max allowed)
+  var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
+  if (tasks.items) {
+    var listSize = tasks.items.length;
+    Logger.log('List size: ' + listSize)
+    for (var i = 0; i < listSize; i++) {
+      var task = tasks.items[i];
+      Tasks.Tasks.remove(taskListId, task.id);
     }
   } else {
     Logger.log('No tasks found.');
@@ -124,6 +161,38 @@ function addGoogleTask(taskListId, title, note = "", parentId = "", previousId =
 }
 
 /**
+ * Sets the completed status of a given task.
+ * @param {String} taskListId The ID of the task list.
+ * @param {String} taskId The ID of the task.
+ * @param {Boolean} completed True if the task should be marked as complete, false otherwise.
+ * NOT IN USE YET
+ */
+function setCompleted(taskListId, taskId, completed) {
+  var task = Tasks.newTask();
+  if (completed) {
+    task.setStatus('completed');
+  } else {
+    task.setStatus('needsAction');
+    task.setCompleted(null);
+  }
+  Tasks.Tasks.patch(task, taskListId, taskId);
+}
+
+/**
+ * Creates a new tasklist with a given title
+ * @param {string} title The title of the new tasklist
+ */
+function createTaskList(title) {
+var title = 'Habitica' //for testing
+var newList = {'title': title}
+Tasks.Tasklists.insert(newList)
+}
+
+/* ========================================== */
+/*         Habitica API Functions             */
+/* ========================================== */
+
+/**
  * Fetches existing Todos from Habitica.
  * @param {string} habTaskURL The URL of the Habitica tasks.
  * @param {const} templateParams The template parameters for the Habitica API.
@@ -134,4 +203,24 @@ function fetchExistingTodos(habTaskURL, templateParams) {
     templateParams._get
   );
   return JSON.parse(response.getContentText());
+}
+
+/**
+ * Checks or unchecks a task in Habitica.
+ * @param {string} habiticaTaskId The URL of the Habitica tasks.
+ * @param {string} direction If set to 'up' means checked or + sign in habit.
+ */
+function api_scoreTask(habiticaTaskId, direction) {
+  const params = {
+    "method" : "post",
+    "headers" : HEADERS,
+    "muteHttpExceptions" : true,
+  }
+  
+  var url = "https://habitica.com/api/v3/tasks/";
+  if ( (habiticaTaskId != "") && (direction != "") ) {
+    url += aliasOrId + "/score/" + direction;
+  }
+
+  return UrlFetchApp.fetch(url, params);
 }
