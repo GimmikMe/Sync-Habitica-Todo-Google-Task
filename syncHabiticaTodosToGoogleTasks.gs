@@ -33,10 +33,7 @@ function habiticaGoogleTasks() {
   };
   console.log(templateParams._post.headers["x-client"]);
 
-  var taskListId = getTaskListId("Habitica");
-  if (taskListId == -1){  //No tasklist with this name found
-    taskListId = createTaskList("Habitica");
-  }
+  taskListId = setupGoogleTasks("Habitica");
   listTasks(taskListId);
 
   const habTodos = fetchExistingTodos(habTaskURL, templateParams);
@@ -75,6 +72,20 @@ function habiticaGoogleTasks() {
 /* ========================================== */
 /*         Google Tasks API functions         */
 /* ========================================== */
+
+/**
+ * Sets up the google task list. Creates a new list if no list found.
+ * Meant to be run once at the startup.
+ * Enhance with future features.
+ * @param {string} taskListTitle title of the google task list that is used for the sync with habitica
+ */
+function setupGoogleTasks(taskListTitle){
+  var taskListId = getTaskListId(taskListTitle);
+  if (taskListId == -1){  //No tasklist with this name found
+    taskListId = createTaskList(taskListTitle);
+  }
+  return taskListId;
+}
 
 /**
  * Lists task lists titles and IDs. returns the 1st task list found
@@ -187,7 +198,7 @@ function setCompleted(taskListId, taskId, completed) {
  * @param {string} title The title of the new tasklist
  */
 function createTaskList(title) {
-var title = 'Habitica' //for testing
+//var title = 'Habitica' //for testing
 var newList = {'title': title}
 var taskList = Tasks.Tasklists.insert(newList);
 return taskList.id;
