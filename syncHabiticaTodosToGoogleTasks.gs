@@ -33,15 +33,18 @@ function habiticaGoogleTasks() {
   };
   console.log(templateParams._post.headers["x-client"]);
 
-  var taskListId = getFirstTaskListId();
+  var taskListId = getTaskListId("Habitica");
+  if (taskListId == -1){  //No tasklist with this name found
+    taskListId = createTaskList("Habitica");
+  }
   listTasks(taskListId);
-  
+
   const habTodos = fetchExistingTodos(habTaskURL, templateParams);
   console.log(habTodos.data);
 
   for (i = 0; i < habTodos.data.length; i++){
-    var parent = addGoogleTask(taskListId, 
-      habTodos.data[i].text, 
+    var parent = addGoogleTask(taskListId,
+      habTodos.data[i].text,
       habTodos.data[i].notes + "\n" + habTodos.data[i].id
     );
 
@@ -66,7 +69,7 @@ function habiticaGoogleTasks() {
 
   listTasks(taskListId);
   var parentTask = Tasks.Tasks.insert({ title: 'Parent' }, taskListId);
-  
+
 }
 
 /* ========================================== */
@@ -77,12 +80,12 @@ function habiticaGoogleTasks() {
  * Lists task lists titles and IDs. returns the 1st task list found
  */
 function getFirstTaskListId() {
-{ 
+{
   var taskLists = Tasks.Tasklists.list();
   if (taskLists.items) {
     for (var i = 0; i < taskLists.items.length; i++) {
       var taskList = taskLists.items[i];
-      Logger.log('Task list with title "%s" and ID "%s" was found.',
+      Logger.log('Task list with title "%s" and ID "%s" was found.',  //for debugging
                  taskList.title, taskList.id);
     }
   } else {
@@ -155,7 +158,7 @@ function addGoogleTask(taskListId, title, note = "", parentId = "", previousId =
   } else {
     task = Tasks.Tasks.insert(task, taskListId);
   }
-  
+
   Logger.log('Task with ID "%s" was created.', task.id);
   return task.id;
 }
@@ -180,12 +183,38 @@ function setCompleted(taskListId, taskId, completed) {
 
 /**
  * Creates a new tasklist with a given title
+ * Returns ID of the task list
  * @param {string} title The title of the new tasklist
  */
 function createTaskList(title) {
 var title = 'Habitica' //for testing
 var newList = {'title': title}
-Tasks.Tasklists.insert(newList)
+var taskList = Tasks.Tasklists.insert(newList);
+return taskList.id;
+}
+
+/**
+ * Gets the ID of a task list by name
+ * returns ID if task list found
+ * returns -1 if task list does not exist
+ * @param {string} title The title of the tasklist
+ */
+function getTaskListId(title) {
+  var taskListId = -1;
+  var taskLists = Tasks.Tasklists.list();
+  if (taskLists.items) {
+    for (var i = 0; i < taskLists.items.length; i++) {
+      var taskList = taskLists.items[i];
+      if (taskList.title == title) {
+        taskListId = taskList.id;
+      }
+      Logger.log('Task list with title "%s" and ID "%s" was found.',  //for debugging
+                 taskList.title, taskList.id);
+    }
+  } else {
+    Logger.log('No task lists found.');
+  }
+  return taskListId;
 }
 
 /* ========================================== */
@@ -216,7 +245,7 @@ function api_scoreTask(habiticaTaskId, direction) {
     "headers" : HEADERS,
     "muteHttpExceptions" : true,
   }
-  
+
   var url = "https://habitica.com/api/v3/tasks/";
   if ( (habiticaTaskId != "") && (direction != "") ) {
     url += aliasOrId + "/score/" + direction;
