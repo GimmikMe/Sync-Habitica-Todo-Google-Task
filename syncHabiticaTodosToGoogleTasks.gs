@@ -3,11 +3,12 @@
 /* ========================================== */
 const USER_ID = ""; //Insert habitica User ID here
 const API_TOKEN = "";//Insert habitica API token here and DO NOT share this with anyone
+const TASK_LIST_NAME = "Habitica"  //Preferred name for the google tasks list to be created from imported Habitica tasks
 const WEB_APP_URL = "";
 
 // PASTE NEW CODE IMMEDIATELY BELOW THIS LINE (to keep our API tokens and tasks private)//
-//--------------------------------------------------------------------------//
-const AUTHOR_ID = ("474a02be-aa26-451d-aa60-6f1db8347c68","59ae9025-f19f-4c05-8b08-0e99167fb118"); //should we add 2 IDs? No idea how this works...
+//--------------------------------------------------------------------------------------//
+const AUTHOR_ID = "474a02be-aa26-451d-aa60-6f1db8347c68";
 const SCRIPT_NAME = "Habitica Google Tasks";
 
 /* ========================================== */
@@ -33,7 +34,7 @@ function habiticaGoogleTasks() {
   };
   console.log(templateParams._post.headers["x-client"]);
 
-  taskListId = setupGoogleTasks("Habitica");
+  taskListId = setupGoogleTasks(TASK_LIST_NAME);
   listTasks(taskListId);
 
   const habTodos = fetchExistingTodos(habTaskURL, templateParams);
@@ -65,7 +66,7 @@ function habiticaGoogleTasks() {
   }
 
   listTasks(taskListId);
-  var parentTask = Tasks.Tasks.insert({ title: 'Parent' }, taskListId);
+  //var parentTask = Tasks.Tasks.insert({ title: 'Parent' }, taskListId); //This was just creating a final task called "Parent" at the top. Commenting out solved the issue. Delete line if not needed for anything.
 
 }
 
@@ -132,7 +133,7 @@ function listTasks(taskListId) {
  * @param  {string} taskListId The tasklist ID.
  */
 function clearAllTasks(taskListId) {
-  var taskListId = getFirstTaskListId() //for testing
+  var taskListId = setupGoogleTasks("Habitica") //for testing
   var optionalArgs = {maxResults: 100}; //increases the default nr of tasks retrieved from 20 to 100 (max allowed)
   var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
   if (tasks.items) {
