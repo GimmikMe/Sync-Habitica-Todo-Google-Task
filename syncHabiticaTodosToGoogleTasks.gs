@@ -9,21 +9,18 @@ YOU HAVE BEEN WARNED! */
 const TASK_LIST_NAME = "Habitica"
 const WEB_APP_URL = ""; //Not implemented yet
 
+//===================================================//
 // [Devs] PASTE NEW CODE IMMEDIATELY BELOW THIS LINE //
 //     (to keep our API tokens and tasks private)    //
 //===================================================//
 const AUTHOR_ID = "474a02be-aa26-451d-aa60-6f1db8347c68";
 const SCRIPT_NAME = "Habitica to Google Tasks";
+const habTaskURL = "https://habitica.com/api/v3/tasks/";
+
 
 // ========================================== //
-//               Main Functions               //
+//               X-Client headers             //
 // ========================================== //
-
-function habiticaGoogleTasks() {
-  const habTaskURL = "https://habitica.com/api/v3/tasks/";
-
-  // X-Cient header
-
   const templateParams = {
     _post: {
       method: "post",
@@ -39,7 +36,19 @@ function habiticaGoogleTasks() {
       headers: { "x-api-user": USER_ID, "x-api-key": API_TOKEN },
     },
   };
-  console.log(templateParams._post.headers["x-client"]);
+  //console.log(templateParams._post.headers["x-client"]);
+
+
+
+// ========================================== //
+//               Main Functions               //
+// ========================================== //
+
+/* Main function to be triggered once or twice a day. Erases the list in GTasks
+and imports all unfinished tasks from Habitica.
+*/
+
+function habiticaGoogleTasks() {
 
 // Check if there is already a task list with the defined name, if not, create one and return its ID (only runs once if tasklist is not deleted)
 
@@ -56,12 +65,13 @@ function habiticaGoogleTasks() {
   //console.log(habTodos.data); //Comment out to disable logging
 
   for (i = habTodos.data.length - 1; i >= 0; i--) { //reverse loop (to keep the habitica task order)
-    var parent = addGoogleTask(taskListId,habTodos.data[i].text,habTodos.data[i].notes + "\n" + habTodos.data[i].id);
+    var parent = addGoogleTask(taskListId,habTodos.data[i].text,habTodos.data[i].id + "\n " + habTodos.data[i].notes);
     //console.log("parent:" + parent);
 
     if (habTodos.data[i].checklist.length != 0){  //If there are subtasks
       var previous = "";
       for (k = 0; k < habTodos.data[i].checklist.length; k++){
+        //Logger.log(habTodos.data[i].checklist[k])
         if (!habTodos.data[i].checklist[k].completed) { //completed subtasks are not imported
         previous = addGoogleTask(taskListId,habTodos.data[i].checklist[k].text,"",parent,previous);
         //console.log('Current subtask id is: ',previous);
@@ -71,6 +81,31 @@ function habiticaGoogleTasks() {
   }
   //listTasks(taskListId); // Uncomment to show final task list in the console after import.
 }
+
+/* Separate function (can be triggered with a different time interval) that
+goes through all tasks in GTasks and checks for completion status. If found,
+the task gets checked in Habitica based on its ID (stored in notes).
+*/
+
+function taskStatusSync() {
+  var taskListId = getTaskListId(TASK_LIST_NAME);
+  var optionalArgs = {maxResults: 100,showHidden: true};
+  var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
+  if (tasks.items) {
+    for (var i = 0; i < tasks.items.length; i++) {
+      var task = tasks.items[i];
+      if (task.status == 'completed') {
+        var firstLine = task.notes.split("\n")[0];
+        var habiticaId = firstLine.trim();
+        Logger.log("Completed task ID sent to Habitica: " + habiticaId)
+        scoreHabititcaTask(habiticaId);
+      }
+    }
+  } else {
+    Logger.log('No tasks found.');
+  }
+}
+
 
 /* ========================================== */
 /*         Google Tasks API functions         */
@@ -95,7 +130,7 @@ function setupGoogleTasks(taskListTitle){
  * @param  {string} taskListId The tasklist ID.
  */
 function listTasks(taskListId) {
-  var optionalArgs = {maxResults: 100};  //increases the default nr of tasks retrieved from 20 to 100 (max allowed)
+  var optionalArgs = {maxResults: 100, showHidden: true};  //max 100 tasks, show completed
   var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
   if (tasks.items) {
     var listSize = tasks.items.length;
@@ -114,7 +149,7 @@ function listTasks(taskListId) {
  * @param  {string} taskListId The tasklist ID.
  */
 function clearAllTasks(taskListId) {
-  var optionalArgs = {maxResults: 100}; //increases the default nr of tasks retrieved from 20 to 100 (max allowed)
+  var optionalArgs = {maxResults: 100,showHidden: true}; //max 100 tasks, show completed
   var tasks = Tasks.Tasks.list(taskListId,optionalArgs);
   if (tasks.items) {
     var listSize = tasks.items.length;
@@ -213,34 +248,36 @@ function getTaskListId(title) {
 // ========================================== //
 
 /**
- * Fetches existing Todos from Habitica.
+ * Gets existing Todos from Habitica.
  * @param {string} habTaskURL The URL of the Habitica tasks.
  * @param {const} templateParams The template parameters for the Habitica API.
  */
 function fetchExistingTodos(habTaskURL, templateParams) {
-  const response = UrlFetchApp.fetch(
+  var response = UrlFetchApp.fetch(
     habTaskURL + "user?type=todos",
-    templateParams._get
-  );
+    templateParams._get);
   return JSON.parse(response.getContentText());
 }
 
 /**
- * Checks or unchecks a task in Habitica.
- * @param {string} habiticaTaskId The URL of the Habitica tasks.
- * @param {string} direction If set to 'up' means checked or + sign in habit.
+ * Scores a task in Habitica.
+ * @param {string} habiticaTaskId The habitica task ID.
  */
-function api_scoreTask(habiticaTaskId, direction) {
-  const params = {
-    "method" : "post",
-    "headers" : HEADERS,
-    "muteHttpExceptions" : true,
+function scoreHabititcaTask(habiticaTaskId) {
+  if (habiticaTaskId != "") {
+    url = habTaskURL + habiticaTaskId + "/score/" + "up";
+    return UrlFetchApp.fetch(url,templateParams._post);
   }
+}
 
-  var url = "https://habitica.com/api/v3/tasks/";
-  if ( (habiticaTaskId != "") && (direction != "") ) {
-    url += habiticaTaskId + "/score/" + direction;
+/**
+ * Scores a checklist item in Habitica.
+ * @param {string} habiticaTaskId The habitica task ID.
+ * @param {string} habiticaItemId The ID of the checklist item.
+ */
+function scoreHabititcaSubtask(habiticaTaskId, habiticaItemId) {
+  if (habiticaItemId != "") {
+    url = habTaskURL + habiticaTaskId + "/checklist/" + habiticaItemId + "/score";
+    return UrlFetchApp.fetch(url,templateParams._post);
   }
-
-  return UrlFetchApp.fetch(url, params);
 }
